@@ -22,3 +22,11 @@ The book id is part of the url of an open book. (The book must be activated for 
         for /ebook/5432/1/index.html the id is 5432/1
         for /ebook/3404/ the id is 3404
 ```
+
+# Setup
+
+1. Download and install node from https://nodejs.org/en/download/
+2. Open a terminal
+3. Navigate to where package.json is
+4. Run "npm install" and wait for it to finish
+5. See Usage
