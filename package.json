@@ -1,0 +1,24 @@
+{
+	"name": "digi4offline",
+	"version": "1.0.1",
+	"description": "Download digi4school books as PDFs for offline use.",
+	"main": "index.js",
+	"author": "Wendelin Muth",
+	"license": "ISC",
+	"keywords": [
+		"digi4school",
+		"download",
+		"offline"
+	],
+	"dependencies": {
+		"canvas": "^2.6.1",
+		"canvg": "^3.0.7",
+		"commander": "^6.1.0",
+		"node-fetch": "^2.6.1",
+		"pdfkit": "^0.11.0",
+		"readline-sync": "^1.4.10",
+		"svg-to-pdfkit": "^0.1.8",
+		"tiny-async-pool": "^1.1.0",
+		"xmldom": "^0.3.0"
+	}
+}
