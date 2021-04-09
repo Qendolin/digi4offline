@@ -19,45 +19,6 @@ class PageWriter {
 			pageNr: pageNr,
 		};
 		return this.wirteNext();
-		return new Promise(async (res) => {
-			for (let page; (page = this.pages[this.current]); this.current++) {
-				let src = this.pages[this.writerIndex];
-				// Free ram
-				this.pages[this.writerIndex] = null;
-				this.writerIndex++;
-
-				this.pdf.addPage();
-				if (src === true) {
-					continue;
-				}
-				try {
-					SVGtoPDF(this.pdf, src, 0, 0);
-				} catch (e) {
-					parentPort.postMessage({
-						action: 'error',
-						data: {
-							message: `Failed to convert page #${this.writerIndex}:${page}, using png fallback, %s`,
-							args: [e],
-						},
-					});
-					await svg2img(src, 909, 1286)
-						.then((png) => {
-							this.pdf.image(png, 0, 0, { fit: [909, 1286] });
-						})
-						.catch((e) => {
-							parentPort.postMessage({
-								action: 'error',
-								data: {
-									message: `Failed to convert page #${this.writerIndex}:${page} to png: %s`,
-									args: [e],
-								},
-							});
-						});
-				}
-				parentPort.postMessage({ action: 'write', data: { page: page, pageIndex: this.writerIndex } });
-			}
-			res();
-		});
 	}
 
 	notifyWriteUpdate(pageNr, writerIndex = this.writerIndex) {
