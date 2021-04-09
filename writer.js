@@ -9,15 +9,23 @@ const { Canvg, presets } = require('canvg');
 
 class PageWriter {
 	pages = [];
-	current = workerData.from;
+	writerIndex = 0;
 	constructor(pdf) {
 		this.pdf = pdf;
 	}
-	add(svgSrc, page) {
-		this.pages[page] = svgSrc || true;
+	add(svgSrc, pageNr, pageIndex) {
+		this.pages[pageIndex] = {
+			src: svgSrc,
+			pageNr: pageNr,
+		};
+		return this.wirteNext();
 		return new Promise(async (res) => {
-			for (let src; (src = this.pages[this.current]); this.current++) {
-				this.pages[this.current] = null;
+			for (let page; (page = this.pages[this.current]); this.current++) {
+				let src = this.pages[this.writerIndex];
+				// Free ram
+				this.pages[this.writerIndex] = null;
+				this.writerIndex++;
+
 				this.pdf.addPage();
 				if (src === true) {
 					continue;
@@ -27,7 +35,10 @@ class PageWriter {
 				} catch (e) {
 					parentPort.postMessage({
 						action: 'error',
-						data: { message: `Failed to convert page ${this.current}, using png fallback, %s`, args: [e] },
+						data: {
+							message: `Failed to convert page #${this.writerIndex}:${page}, using png fallback, %s`,
+							args: [e],
+						},
 					});
 					await svg2img(src, 909, 1286)
 						.then((png) => {
@@ -36,14 +47,67 @@ class PageWriter {
 						.catch((e) => {
 							parentPort.postMessage({
 								action: 'error',
-								data: { message: `Failed to convert page ${this.current} to png: %s`, args: [e] },
+								data: {
+									message: `Failed to convert page #${this.writerIndex}:${page} to png: %s`,
+									args: [e],
+								},
 							});
 						});
 				}
-				parentPort.postMessage({ action: 'write', data: { page: this.current } });
+				parentPort.postMessage({ action: 'write', data: { page: page, pageIndex: this.writerIndex } });
 			}
 			res();
 		});
+	}
+
+	notifyWriteUpdate(pageNr, writerIndex = this.writerIndex) {
+		parentPort.postMessage({
+			action: 'write',
+			data: {
+				page: pageNr,
+				pageIndex: writerIndex,
+			},
+		});
+	}
+
+	notifyError(message, ...args) {
+		parentPort.postMessage({
+			action: 'error',
+			data: {
+				message: message,
+				args: args,
+			},
+		});
+	}
+
+	async wirteNext() {
+		const page = this.pages[this.writerIndex];
+		if (page == null) return;
+
+		// Free ram
+		this.pages[this.writerIndex] = null;
+		this.writerIndex++;
+		const { src, pageNr } = page;
+		this.pdf.addPage();
+
+		if (!src) {
+			this.notifyWriteUpdate(pageNr);
+			return this.wirteNext();
+		}
+
+		try {
+			SVGtoPDF(this.pdf, src, 0, 0);
+		} catch (e) {
+			this.notifyError(`Failed to convert page #${this.writerIndex}:${page}, using png fallback, %s`, e);
+			try {
+				const png = await svg2img(src, 909, 1286);
+				this.pdf.image(png, 0, 0, { fit: [909, 1286] });
+			} catch (e) {
+				this.notifyError(`Failed to convert page #${this.writerIndex}:${page} to png: %s`, e);
+			}
+		}
+		this.notifyWriteUpdate(pageNr);
+		return this.wirteNext();
 	}
 }
 
@@ -70,7 +134,7 @@ parentPort.on('message', (m) => {
 	switch (m.action) {
 		case 'add':
 			m.data.src = Buffer.from(m.data.src).toString('utf-8');
-			queue = queue.then(() => writer.add(m.data.src, m.data.page));
+			queue = queue.then(() => writer.add(m.data.src, m.data.page, m.data.pageIndex));
 			break;
 		case 'end':
 			queue.then(() => {

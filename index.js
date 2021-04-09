@@ -12,13 +12,12 @@ program.requiredOption('-e, --email <address>', 'Your digi4school login email');
 program.requiredOption('-b, --book <id>', 'The id of the book you want to download');
 program.option('-o, --out <name>', 'Output path, can specify file or folder');
 program.option('-p, --password <password>', 'Your digi4school login password (not recommended)');
-program.option(
-	'--from <pageNr>',
-	'The page number to start downloading (inclusive)',
-	(value, _) => parseInt(value),
-	'1'
-);
-program.option('--to <pageNr>', 'The page number to stop downloading (inclusive)', (value, _) => parseInt(value));
+program.option('-r, --range <range>', 'Page ranges, i.e.: 5-10,12,15-', (value, _) => {
+	return value
+		.split(',')
+		.map((range) => range.split('-'))
+		.map(([from, to]) => ({ from: parseInt(from), to: parseInt(to ?? from) }));
+});
 program.option(
 	'--dop <degree>',
 	'The amount of pages that can be downloaded at the same time',
@@ -40,7 +39,8 @@ program.on('--help', () => {
 
 program.parse(process.argv);
 
-program.from = Number(program.from) || 1;
+program.range = program.range ?? [{ from: NaN, to: NaN }];
+program.range[0].from = program.range[0].from || 1;
 
 const metaInfoNames = [
 	'title',
@@ -229,9 +229,22 @@ authUser(program.email, program.password, new Cookies())
 		await authBook(program.book, c);
 
 		console.time('duration');
-		let pages = await getPages(program.book, c);
-		if ('to' in program) pages = Math.min(pages, program.to);
-		if ('from' in program) pages -= program.from - 1;
+		const bookLength = await getPages(program.book, c);
+		const pages = [
+			...program.range
+				.reduce((pages, { from, to }, index) => {
+					if (isNaN(from) || (isNaN(to) && index != program.range.length - 1)) {
+						throw new Error(`Range ${index + 1} is invalid`);
+					}
+					if (isNaN(to)) {
+						to = bookLength;
+					}
+					[...Array(to - from + 1)].forEach((_, i) => pages.add(Math.min(bookLength, from + i)));
+					return pages;
+				}, new Set())
+				.values(),
+		];
+
 		const docInfo = await fetchInfo(program.book, c);
 		console.log(
 			'Title: %s\nSBNR: %s\nPublisher: %s\n\tURL: %s\n\tAddress: %s\n\tPhone Number: %s\n\tEmail Adress: %s',
@@ -250,14 +263,12 @@ authUser(program.email, program.password, new Cookies())
 			workerData: {
 				file: program.out,
 				info: docInfo,
-				from: program.from,
 			},
 		});
-		let writeProgress = 0;
 		writer.on('message', (m) => {
 			switch (m.action) {
 				case 'write':
-					console.log('Wrote page %s/%s %s', ++writeProgress, pages, m.data.page);
+					console.log('Wrote page %s/%s %s', m.data.pageIndex + 1, pages.length, m.data.page);
 					break;
 				case 'error':
 					console.error(m.data.message, ...m.data.args);
@@ -275,79 +286,69 @@ authUser(program.email, program.password, new Cookies())
 		})();
 
 		const XML = new XMLSerializer();
-		await asyncPool(
-			program.dop,
-			Array(pages)
-				.fill()
-				.map((_, i) => {
-					if ('from' in program) return program.from + i;
-					return i;
-				}),
-			async (page) => {
-				if (page != program.from) await firstPage;
-				const src = await fetchPage(program.book, page, c);
-				if (src == null) {
-					++downloadProgress;
-					console.log('Failed to download page %s', page);
-					writer.postMessage({
-						action: 'add',
-						data: {
-							page: page,
+		await asyncPool(program.dop, Object.entries(pages), async ([index, page]) => {
+			if (index != 0) await firstPage;
+			const src = await fetchPage(program.book, page, c);
+			if (src == null) {
+				++downloadProgress;
+				console.log('Failed to download page %s', page);
+				writer.postMessage({
+					action: 'add',
+					data: {
+						page: page,
+					},
+				});
+				if (page == program.from) firstPage.resolve();
+				return;
+			}
+			const svg = new DOMParser().parseFromString(src, 'image/svg+xml');
+			fixStuff(svg);
+			await asyncPool(2, Array.from(svg.documentElement.getElementsByTagName('image')), async (img) => {
+				const attr = img.hasAttribute('xlink:href') ? 'xlink:href' : 'href';
+				const href = new URL(img.getAttribute(attr), `https://a.digi4school.at/ebook/${program.book}/${page}/`)
+					.href;
+				let retry = program.faster ? 1 : 10;
+				let data;
+				do {
+					data = await fetch(href, {
+						headers: {
+							cookie: c,
 						},
-					});
-					if (page == program.from) firstPage.resolve();
+					})
+						.then((res) => {
+							if (!res.ok) throw res;
+							retry = 0;
+							return res.buffer();
+						})
+						.catch((e) => {
+							if (e instanceof FetchError) retry--;
+							else throw e;
+						});
+				} while (retry != 0);
+
+				if (!data) {
+					img.parentNode.removeChild(img);
 					return;
 				}
-				const svg = new DOMParser().parseFromString(src, 'image/svg+xml');
-				fixStuff(svg);
-				await asyncPool(2, Array.from(svg.documentElement.getElementsByTagName('image')), async (img) => {
-					const attr = img.hasAttribute('xlink:href') ? 'xlink:href' : 'href';
-					const href = new URL(
-						img.getAttribute(attr),
-						`https://a.digi4school.at/ebook/${program.book}/${page}/`
-					).href;
-					let retry = program.faster ? 1 : 10;
-					let data;
-					do {
-						data = await fetch(href, {
-							headers: {
-								cookie: c,
-							},
-						})
-							.then((res) => {
-								if (!res.ok) throw res;
-								retry = 0;
-								return res.buffer();
-							})
-							.catch((e) => {
-								if (e instanceof FetchError) retry--;
-								else throw e;
-							});
-					} while (retry != 0);
+				img.setAttribute('xlink:href', `data:image;base64,${data.toString('base64')}`);
+			});
 
-					if (!data) {
-						img.parentNode.removeChild(img);
-						return;
-					}
-					img.setAttribute('xlink:href', `data:image;base64,${data.toString('base64')}`);
-				});
-
-				let buf = Buffer.from(XML.serializeToString(svg), 'utf8');
-				buf = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-				writer.postMessage(
-					{
-						action: 'add',
-						data: {
-							src: buf,
-							page: page,
-						},
+			let buf = Buffer.from(XML.serializeToString(svg), 'utf8');
+			buf = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+			writer.postMessage(
+				{
+					action: 'add',
+					data: {
+						src: buf,
+						page: page,
+						pageIndex: index,
 					},
-					[buf]
-				);
-				console.log('Downloaded page %s/%s %s', ++downloadProgress, pages, page);
-				if (page == program.from) firstPage.resolve();
-			}
-		);
+				},
+				[buf]
+			);
+			console.log('Downloaded page %s/%s %s', ++downloadProgress, pages.length, page);
+			if (index == 0) firstPage.resolve();
+		});
 		await new Promise((res) => {
 			writer.on('message', (m) => {
 				if (m == 'done') res();
@@ -370,7 +371,7 @@ function createOut(docInfo, pages) {
 				'ebook',
 				program.book.replace(/\//, '_'),
 				docInfo.sbnr ? `sbnr_${docInfo.sbnr}` : null,
-				`p_${program.from ?? 0}-${program.to ?? program.from + pages - 1}`,
+				`p_${findRanges(pages)}`,
 			]
 				.filter((x) => !!x)
 				.join('-') + '.pdf';
@@ -381,6 +382,31 @@ function createOut(docInfo, pages) {
 	out = path.join(path.resolve(dir), file);
 	if (fs.existsSync(out)) fs.truncateSync(out);
 	program.out = out;
+}
+
+// https://stackoverflow.com/a/55008541/7448536
+function findRanges(numbers) {
+	return [...numbers]
+		.sort((a, b) => a - b)
+		.reduce(
+			(acc, x, i) => {
+				if (i === 0) {
+					acc.ranges.push(x);
+					acc.rangeStart = x;
+				} else {
+					if (x === acc.last + 1) {
+						acc.ranges[acc.ranges.length - 1] = acc.rangeStart + '-' + x;
+					} else {
+						acc.ranges.push(x);
+						acc.rangeStart = x;
+					}
+				}
+				acc.last = x;
+				return acc;
+			},
+			{ ranges: [] }
+		)
+		.ranges.join('_');
 }
 
 /**
@@ -411,6 +437,5 @@ function fixStuff(svg) {
 			e.firstChild.nodeValue = fix;
 			e.firstChild.data = fix;
 		}
-		// if (e.tagName.toUpperCase() == 'STYLE') console.log(e.firstChild.nodeValue);
 	}
 }

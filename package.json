@@ -5,6 +5,7 @@
 	"main": "index.js",
 	"author": "Wendelin Muth",
 	"license": "ISC",
+	"type": "commonjs",
 	"keywords": [
 		"digi4school",
 		"download",
