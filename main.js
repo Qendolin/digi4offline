@@ -18,8 +18,18 @@ program.option(
 	(value) => parseInt(value),
 	5
 );
-program.option('--pageRetries', 'How often a page download should be retired', (value) => parseInt(value), 10);
-program.option('--imageRetries', 'How often a image download should be retired', (value) => parseInt(value), 10);
+program.option(
+	'--pageRetries <retries>',
+	'How often a page download should be retired',
+	(value) => parseInt(value),
+	10
+);
+program.option(
+	'--imageRetries <retries>',
+	'How often a image download should be retired',
+	(value) => parseInt(value),
+	10
+);
 
 program.on('--help', () => {
 	console.log('');

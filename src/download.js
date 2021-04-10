@@ -1,9 +1,11 @@
 import { sanitizeSvg } from './sanitize.js';
 import { toArrayBuffer } from './util.js';
+import { DOMParser, XMLSerializer } from 'xmldom';
+import asyncPool from 'tiny-async-pool';
 
-const { DOMParser, XMLSerializer } = require('xmldom');
-
-const asyncPool = require('tiny-async-pool');
+/**
+ * @typedef {import('./util').Range} Range
+ */
 
 export class RangeDownloader {
 	/** @type {number} */
@@ -23,7 +25,7 @@ export class RangeDownloader {
 
 	/**
 	 * @param {number[]} pages
-	 * @param {(data: ArrayBuffer, info: {pageIndex: number, pageNr: number, pageCount: number, downloadNr: number}) => void} cb
+	 * @param {(data: {svg: Buffer, images: {buffer: Buffer, map: Map<string, Range>}}, info: {pageIndex: number, pageNr: number, pageCount: number, downloadNr: number}) => void} cb
 	 */
 	async download(pages, cb) {
 		let resolveFirstPage;
@@ -34,10 +36,10 @@ export class RangeDownloader {
 		let downloadNr = 1;
 		return asyncPool(this.poolSize, [...pages.entries()], async ([index, nr]) => {
 			if (index !== 0) await firstPage;
-			const data = await this._downloadPage(nr);
+			const page = await this._downloadPage(nr);
 			if (index === 0) resolveFirstPage();
 
-			cb(data, {
+			cb(page, {
 				pageCount: pages.length,
 				pageIndex: index,
 				pageNr: nr,
@@ -49,7 +51,7 @@ export class RangeDownloader {
 	/**
 	 * @private
 	 * @param {number} nr
-	 * @returns {Promise<ArrayBuffer>}
+	 * @returns {Promise<{svg: Buffer, images: {buffer: Buffer, map: Map<string, Range>}}>}
 	 */
 	async _downloadPage(nr) {
 		const src = await this.book.page(nr);
@@ -63,35 +65,50 @@ export class RangeDownloader {
 			return;
 		}
 		sanitizeSvg(svg);
-		await this._inlineImages(svg, nr);
-		return toArrayBuffer(Buffer.from(this.serializer.serializeToString(svg), 'utf8'));
+		const images = await this._downloadImages(svg, nr);
+		return { svg: Buffer.from(this.serializer.serializeToString(svg), 'utf8'), images: images };
 	}
 
 	/**
 	 * @private
 	 * @param {Document} svg
 	 * @param {number} pageNr
+	 * @returns {Promise<{buffer: Buffer, map: Map<string, Range>}>}
 	 */
-	async _inlineImages(svg, pageNr) {
+	async _downloadImages(svg, pageNr) {
+		const chunks = [];
+		/** @type {Map<string, Range>} */
+		const chunkMap = new Map();
+		let totalLength = 0;
+
 		const images = Array.from(svg.documentElement.getElementsByTagName('image'));
 		await asyncPool(2, images, async (img) => {
-			const data = await this._downloadImage(pageNr, img);
+			const { link, data } = await this._downloadImage(pageNr, img);
 			if (!data) {
-				img.parentNode.removeChild(img);
+				console.warn('Failed to download image %s on page %s', link, pageNr);
 				return;
 			}
-			img.setAttribute('xlink:href', `data:image;base64,${data.toString('base64')}`);
+
+			chunks.push(data);
+			chunkMap.set(link, { from: totalLength, to: totalLength + data.length });
+			totalLength += data.length;
 		});
+
+		return { buffer: Buffer.concat(chunks, totalLength), map: chunkMap };
 	}
 
 	/**
 	 * @private
 	 * @param {number} pageNr
 	 * @param {SVGImageElement} img
-	 * @returns {Promise<Buffer>}
+	 * @returns {Promise<{link: string, data: Buffer}>}
 	 */
-	_downloadImage(pageNr, img) {
+	async _downloadImage(pageNr, img) {
 		const attr = img.hasAttribute('xlink:href') ? 'xlink:href' : 'href';
-		return this.book.image(pageNr, img.getAttribute(attr));
+		const link = img.getAttribute(attr);
+		return {
+			link: link,
+			data: await this.book.image(pageNr, link),
+		};
 	}
 }

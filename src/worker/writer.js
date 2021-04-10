@@ -8,8 +8,19 @@ import fetch from 'node-fetch';
 import { Canvg, presets } from 'canvg';
 import { Message } from './message.js';
 
+// https://chromium.googlesource.com/chromium/blink-public/+/refs/heads/master/default_100_percent/blink/broken_image.png
+const brokenImageSrc =
+	'iVBORw0KGgoAAAANSUhEUgAAAA4AAAAQCAYAAAAmlE46AAABh0lEQVQoU42QSS9DURiGv7VfhKWEnyA2' +
+	'WFizsLciJGrowDVU55VIjE3sxFhB1ZDiVlUapYYguLRor9f5DrdRuaJv8izOOc+zORQIBFAKRFRGP+f3' +
+	'B6BlP/CYMecpo0NRFLBXFPt8fpzf6ThO50xJ3rzLkMduIfZ6vTi51hE5fZMYM85q6rUQ8tiXsdvtQfxK' +
+	'x3biFb/Hd0citNlsRXBDLpdbhmbbimcRiWu4uMvhXstL+D+4IadzDPFLHRvHL6aETzLYT2ZxcPZF6lYH' +
+	'NzQ66kQsnUdIfS4Jdrmh4eERqOKwdqiVBLuiIVKUIagXeaxEtQLL0UfMRKII7sSK7hnhckM0OKjgSISL' +
+	'ew8ST2getePlqJuskDTPNWI2rBrvJFxuiByOARye57Gw+wDbklfIlYXIoH6yChObERIOCVc2ZLc7ZOha' +
+	'DZpG31DDVDXNhRMcghuyWu1YT6TROF3zZ2TQEmxCNPUObqi/34q2hdZ/I+Oud60HvdY+UGdnF9rbO8yg' +
+	'HxS9dVss+AQqZY47NSC2iwAAAABJRU5ErkJggg==';
+
 class PageWriter {
-	/** @type {any[]} */
+	/** @type {{svgSrc: string, imageBuffer: Buffer, images: Map<string, import('../util.js').Range>, pageNr: number}[]} */
 	pages = [];
 	writerIndex = 0;
 
@@ -22,12 +33,16 @@ class PageWriter {
 
 	/**
 	 * @param {string} svgSrc
+	 * @param {Map<string, import('../util.js').Range>} images Map of image link to buffer slice
+	 * @param {Buffer} imageBuffer
 	 * @param {number} pageNr
 	 * @param {number} pageIndex
 	 */
-	add(svgSrc, pageNr, pageIndex) {
+	add(svgSrc, images, imageBuffer, pageNr, pageIndex) {
 		this.pages[pageIndex] = {
-			src: svgSrc,
+			svgSrc: svgSrc,
+			imageBuffer: imageBuffer,
+			images: images,
 			pageNr: pageNr,
 		};
 		return this.wirteNext();
@@ -69,20 +84,43 @@ class PageWriter {
 		// Free ram
 		this.pages[this.writerIndex] = null;
 		this.writerIndex++;
-		const { src, pageNr } = page;
+		const { svgSrc, imageBuffer, images, pageNr } = page;
 		this.pdf.addPage();
 
-		if (!src) {
+		if (!svgSrc) {
 			this.notifyWriteUpdate(pageNr);
 			return this.wirteNext();
 		}
 
 		try {
-			SVGtoPDF(this.pdf, src, 0, 0);
+			SVGtoPDF(this.pdf, svgSrc, 0, 0, {
+				fontCallback: (family, bold, italic, options, ...args) => {
+					console.log('Font Callback: %s %s %s %o .', family, bold, italic, options, ...args);
+				},
+				imageCallback: (link) => {
+					if (!images.has(link)) {
+						console.error('Missing image on page %s: %s', pageNr, link);
+						return `data:image/png;base64,${brokenImageSrc}`;
+					}
+					const range = images.get(link);
+					return imageBuffer.slice(range.from, range.to);
+				},
+				documentCallback: (file, ...args) => {
+					console.log('Document Callback: %o .', file, ...args);
+					return file;
+				},
+				/*colorCallback: ([[r, g, b], a], raw, ...args) => {
+					console.log('Color Callback: %s %s %s %s %s.', r, g, b, a, raw, ...args);
+					return [[r, g, b], a];
+				},*/
+				warningCallback: (msg, ...args) => {
+					console.log('Warning Callback: %s .', msg, ...args);
+				},
+			});
 		} catch (e) {
 			this.notifyError(`Failed to convert page #${this.writerIndex}:${page}, using png fallback, %s`, e);
 			try {
-				const png = await svg2img(src, 909, 1286);
+				const png = await svg2img(svgSrc, 909, 1286);
 				this.pdf.image(png, 0, 0, { fit: [909, 1286] });
 			} catch (e) {
 				this.notifyError(`Failed to convert page #${this.writerIndex}:${page} to png: %s`, e);
@@ -116,8 +154,9 @@ parentPort.on('message', (m) => {
 	switch (m.action) {
 		case 'add':
 			{
-				const src = Buffer.from(m.data.src).toString('utf-8');
-				queue = queue.then(() => writer.add(src, m.data.page, m.data.pageIndex));
+				const svgSrc = Buffer.from(m.data.svgBuffer).toString('utf-8');
+				const imageBuffer = Buffer.from(m.data.imageBuffer);
+				queue = queue.then(() => writer.add(svgSrc, m.data.images, imageBuffer, m.data.page, m.data.pageIndex));
 			}
 			break;
 		case 'end':

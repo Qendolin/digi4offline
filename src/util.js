@@ -1,9 +1,10 @@
 /**
  * @param {number} times
  * @param {() => Promise<any>} fn
- * @returns {Promise<any | undefined>}
+ * @returns {Promise<any>}
  */
 export async function retryAsync(times, fn) {
+	times = Math.max(times, 1);
 	do {
 		const res = await fn();
 		if (res !== undefined) return res;
@@ -69,3 +70,9 @@ export class ResponseError extends DetailError {
 		super(`${message}: invalid response: ${response.status}`, response);
 	}
 }
+
+/**
+ * @typedef Range
+ * @property {number} from
+ * @property {number} to
+ */

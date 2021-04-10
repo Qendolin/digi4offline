@@ -17,7 +17,6 @@ export function sanitizeSvg(svg) {
  */
 function fixStrokeDashArray(element) {
 	if (element.hasAttribute('stroke-dasharray')) {
-		debugger;
 		const fix = element
 			.getAttribute('stroke-dasharray')
 			.split(/,?\s*/g)
@@ -27,7 +26,6 @@ function fixStrokeDashArray(element) {
 		element.setAttribute('stroke-dasharray', fix);
 	}
 	if (element.tagName.toUpperCase() === 'STYLE' && element.firstChild && element.firstChild.nodeValue) {
-		debugger;
 		/** @type {Text} */
 		// @ts-ignore
 		const styleText = element.firstChild;

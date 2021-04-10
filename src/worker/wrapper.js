@@ -62,18 +62,22 @@ export class Writer extends EventEmitter {
 	}
 
 	/**
-	 * @param {ArrayBuffer} buffer
+	 * @param {Buffer} svgBuffer
+	 * @param {Map<string, import('../util.js').Range>} images Map of image link to buffer slice
+	 * @param {Buffer} imageBuffer
 	 * @param {number} pageIndex
 	 * @param {number} pageNr
 	 */
-	write(buffer, pageIndex, pageNr) {
+	write(svgBuffer, images, imageBuffer, pageIndex, pageNr) {
 		this.worker.postMessage(
 			new Message('add', {
-				src: buffer,
+				svgBuffer: svgBuffer,
+				imageBuffer: imageBuffer,
+				images: images,
 				page: pageNr,
 				pageIndex: pageIndex,
 			}),
-			[buffer]
+			[svgBuffer.buffer, imageBuffer.buffer]
 		);
 	}
 

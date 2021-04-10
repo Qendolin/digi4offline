@@ -70,9 +70,9 @@ export class Digi4Offline {
 			console.error(msg, ...args);
 		});
 
-		await downloader.download(pages, (data, { pageIndex, pageNr, downloadNr }) => {
+		await downloader.download(pages, ({ svg, images }, { pageIndex, pageNr, downloadNr }) => {
 			console.log('Downloaded page %s/%s %s', downloadNr, pages.length, pageNr);
-			writer.write(data, pageIndex, pageNr);
+			writer.write(svg, images.map, images.buffer, pageIndex, pageNr);
 		});
 
 		writer.end();

@@ -27,12 +27,7 @@ const metaInfoNames = [
 
 /**
  * @typedef {import('./auth').Cookies} Cookies
- */
-
-/**
- * @typedef Range
- * @property {number} from
- * @property {number} to
+ * @typedef {import('./util').Range} Range
  */
 
 /**
@@ -173,8 +168,8 @@ export class Book {
 	async image(pageNr, path) {
 		const href = new URL(path, `${this.url}${pageNr}/`).href;
 
-		return retryAsync(this.options.retryImage, async () => {
-			await fetch(href, {
+		return retryAsync(this.options.retryImage, () => {
+			return fetch(href, {
 				headers: {
 					cookie: this.credentials.toString(),
 				},
