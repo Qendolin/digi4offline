@@ -1,18 +1,30 @@
-const { workerData, parentPort } = require('worker_threads');
-const PDFDocument = require('pdfkit');
-const fs = require('fs');
-const SVGtoPDF = require('svg-to-pdfkit');
-const { DOMParser } = require('xmldom');
-const canvas = require('canvas');
-const fetch = require('node-fetch');
-const { Canvg, presets } = require('canvg');
+import { workerData, parentPort } from 'worker_threads';
+import PDFDocument from 'pdfkit';
+import fs from 'fs';
+import SVGtoPDF from 'svg-to-pdfkit';
+import { DOMParser } from 'xmldom';
+import canvas from 'canvas';
+import fetch from 'node-fetch';
+import { Canvg, presets } from 'canvg';
+import { Message } from './message.js';
 
 class PageWriter {
+	/** @type {any[]} */
 	pages = [];
 	writerIndex = 0;
+
+	/**
+	 * @param {PDFKit.PDFDocument} pdf
+	 */
 	constructor(pdf) {
 		this.pdf = pdf;
 	}
+
+	/**
+	 * @param {string} svgSrc
+	 * @param {number} pageNr
+	 * @param {number} pageIndex
+	 */
 	add(svgSrc, pageNr, pageIndex) {
 		this.pages[pageIndex] = {
 			src: svgSrc,
@@ -21,26 +33,35 @@ class PageWriter {
 		return this.wirteNext();
 	}
 
+	/**
+	 * @param {any} pageNr
+	 * @param {number} writerIndex
+	 */
 	notifyWriteUpdate(pageNr, writerIndex = this.writerIndex) {
-		parentPort.postMessage({
-			action: 'write',
-			data: {
+		parentPort.postMessage(
+			new Message('write', {
 				page: pageNr,
-				pageIndex: writerIndex,
-			},
-		});
+				pageIndex: writerIndex - 1,
+			})
+		);
 	}
 
+	/**
+	 * @param {string} message
+	 * @param {any[]} args
+	 */
 	notifyError(message, ...args) {
-		parentPort.postMessage({
-			action: 'error',
-			data: {
+		parentPort.postMessage(
+			new Message('error', {
 				message: message,
 				args: args,
-			},
-		});
+			})
+		);
 	}
 
+	/**
+	 * @returns {Promise<any>}
+	 */
 	async wirteNext() {
 		const page = this.pages[this.writerIndex];
 		if (page == null) return;
@@ -86,7 +107,7 @@ const pdf = new PDFDocument({
 const writer = new PageWriter(pdf);
 const filestream = pdf.pipe(fs.createWriteStream(workerData.file));
 filestream.on('finish', () => {
-	parentPort.postMessage('done');
+	parentPort.postMessage(new Message('done'));
 });
 
 let queue = Promise.resolve();
@@ -94,19 +115,24 @@ let queue = Promise.resolve();
 parentPort.on('message', (m) => {
 	switch (m.action) {
 		case 'add':
-			m.data.src = Buffer.from(m.data.src).toString('utf-8');
-			queue = queue.then(() => writer.add(m.data.src, m.data.page, m.data.pageIndex));
+			{
+				const src = Buffer.from(m.data.src).toString('utf-8');
+				queue = queue.then(() => writer.add(src, m.data.page, m.data.pageIndex));
+			}
 			break;
 		case 'end':
 			queue.then(() => {
-				console.log('Flushing pdf...');
 				pdf.end();
-				console.log(filestream.path);
 			});
 			break;
 	}
 });
 
+/**
+ * @param {string} svgSrc
+ * @param {number} width
+ * @param {number} height
+ */
 async function svg2img(svgSrc, width, height) {
 	const preset = presets.node({
 		DOMParser,
@@ -115,8 +141,8 @@ async function svg2img(svgSrc, width, height) {
 	});
 	const cnv = preset.createCanvas(width, height);
 	const ctx = cnv.getContext('2d');
-	const v = Canvg.fromString(ctx, svgSrc, preset);
 
+	const v = Canvg.fromString(ctx, svgSrc, preset);
 	await v.render();
 
 	return cnv.toBuffer('image/png');

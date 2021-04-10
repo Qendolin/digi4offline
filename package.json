@@ -3,9 +3,14 @@
 	"version": "1.0.1",
 	"description": "Download digi4school books as PDFs for offline use.",
 	"main": "index.js",
+	"module": "main.js",
 	"author": "Wendelin Muth",
-	"license": "ISC",
+	"license": "MPL",
 	"type": "commonjs",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Qendolin/digi4offline.git"
+	},
 	"keywords": [
 		"digi4school",
 		"download",
@@ -15,11 +20,15 @@
 		"canvas": "^2.6.1",
 		"canvg": "^3.0.7",
 		"commander": "^6.1.0",
+		"esm": "^3.2.25",
 		"node-fetch": "^2.6.1",
 		"pdfkit": "^0.11.0",
-		"readline-sync": "^1.4.10",
+		"read": "^1.0.7",
 		"svg-to-pdfkit": "^0.1.8",
 		"tiny-async-pool": "^1.1.0",
 		"xmldom": "^0.3.0"
+	},
+	"devDependencies": {
+		"@types/node-fetch": "^2.5.10"
 	}
 }

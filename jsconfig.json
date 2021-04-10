@@ -1,0 +1,15 @@
+{
+	"compilerOptions": {
+		"target": "esnext",
+		"module": "es2020",
+		"allowSyntheticDefaultImports": true,
+		"checkJs": true,
+		"lib": ["esnext"],
+		"moduleResolution": "node",
+		"esModuleInterop": true
+	},
+	"typeAcquisition": {
+		"enable": true
+	},
+	"include": ["src/**/*.js", "main.js", "src/worker/writer.mjs"]
+}

@@ -107,5 +107,6 @@ dist
 # TernJS port file
 .tern-port
 
-# PDF test files
+# test files
 *.pdf
+*.svg
