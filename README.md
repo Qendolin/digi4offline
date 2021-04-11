@@ -7,7 +7,7 @@ npm install -g digi4offline
 
 # Usage
 
-Run `digi4offile [options]` or `node bin/cli.js [options]`
+Run `digi4offline [options]` or `node bin/cli.js [options]`
 
 ```
 Options:
