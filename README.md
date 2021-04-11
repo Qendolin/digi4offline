@@ -1,7 +1,12 @@
 # digi4offline
- Download digi4school books as pdf
+Download digi4school books as PDF.
+
+```
+npm install -g digi4offline
+```
 
 # Usage
+
 Run `digi4offile [options]` or `node bin/cli.js [options]`
 
 ```
@@ -27,6 +32,5 @@ The book id is part of the url of an open book. (The book must be activated for 
 
 1. Download and install node from https://nodejs.org/en/download/
 2. Open a terminal
-3. Navigate to where package.json is
-4. Run "npm install" and wait for it to finish
-5. See Usage
+3. Run `npm install -g digi4offline`
+4. See Usage

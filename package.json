@@ -21,7 +21,10 @@
 	"keywords": [
 		"digi4school",
 		"download",
-		"offline"
+		"downloader",
+		"offline",
+		"pdf",
+		"pdfkit"
 	],
 	"dependencies": {
 		"canvas": "^2.6.1",
