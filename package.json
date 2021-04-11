@@ -5,7 +5,7 @@
 	"main": "index.js",
 	"module": "main.js",
 	"author": "Wendelin Muth",
-	"license": "MPL",
+	"license": "MPL-2.0",
 	"type": "commonjs",
 	"repository": {
 		"type": "git",
