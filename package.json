@@ -1,15 +1,22 @@
 {
 	"name": "digi4offline",
-	"version": "1.0.1",
+	"version": "1.1.0",
 	"description": "Node.js based command line tool for downloading digi4school books as PDFs for offline use.",
 	"main": "index.js",
 	"module": "main.js",
 	"author": "Wendelin Muth",
 	"license": "MPL-2.0",
 	"type": "commonjs",
+	"scripts": {
+		"build": "cross-env NODE_ENV=production babel --delete-dir-on-start -d lib .",
+		"prepublish": "npm run build"
+	},
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/Qendolin/digi4offline.git"
+	},
+	"bin": {
+		"digi4offline": "./bin/digi4offline.js"
 	},
 	"keywords": [
 		"digi4school",
@@ -29,6 +36,15 @@
 		"xmldom": "^0.3.0"
 	},
 	"devDependencies": {
-		"@types/node-fetch": "^2.5.10"
+		"@babel/cli": "^7.13.14",
+		"@babel/core": "^7.13.14",
+		"@babel/plugin-proposal-class-properties": "^7.13.0",
+		"@babel/plugin-transform-modules-commonjs": "^7.13.8",
+		"@babel/preset-env": "^7.13.15",
+		"@types/node-fetch": "^2.5.10",
+		"babel-plugin-transform-node-env-inline": "^0.4.3",
+		"babel-preset-minify": "^0.5.1",
+		"cross-env": "^7.0.3",
+		"pkg": "^4.5.1"
 	}
 }

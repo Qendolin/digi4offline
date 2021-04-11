@@ -1,0 +1,27 @@
+{
+	"plugins": [
+		"@babel/plugin-transform-modules-commonjs",
+		"@babel/plugin-proposal-class-properties",
+		"transform-node-env-inline"
+	],
+	"presets": [
+		[
+			"@babel/preset-env",
+			{
+				"targets": {
+					"node": "10"
+				}
+			}
+		],
+		[
+			"minify",
+			{
+				"keepClassName": false,
+				"keepFnName": false,
+				"tdz": false
+			}
+		]
+	],
+	"comments": false,
+	"only": ["./main.js", "index.js", "./src/"]
+}

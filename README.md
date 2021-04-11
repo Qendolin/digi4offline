@@ -2,7 +2,7 @@
  Download digi4school books as pdf
 
 # Usage
-Run `node index.js [options]`
+Run `digi4offile [options]` or `node bin/cli.js [options]`
 
 ```
 Options:
@@ -10,9 +10,10 @@ Options:
   -b, --book <id>            The id of the book you want to download
   -o, --out <name>           Output path, can specify file or folder
   -p, --password <password>  Your digi4school login password (not recommended)
-  -r, --range <range>        Page ranges, i.e.: 5-10,12,15-
-  --dop <degree>             The amount of pages that can be downloaded at the same time (default: "5")
-  --faster                   Don't retry downloading images
+  -r, --ranges <ranges>       Page ranges, i.e.: 5-10,12,15-
+  --dop <degree>             The amount of pages that can be downloaded at the same time (default: 5)
+  --pageRetries <retries>    How often a page download should be retired (default: 10)
+  --imageRetries <retries>   How often a image download should be retired (default: 10)
   -h, --help                 display help for command
 
 The password argument is optional. When not provided you will be prompted to input your password into the terminal. This way is recommended because you password will be hidden.

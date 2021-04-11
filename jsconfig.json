@@ -11,5 +11,5 @@
 	"typeAcquisition": {
 		"enable": true
 	},
-	"include": ["src/**/*.js", "main.js", "src/worker/writer.mjs"]
+	"include": ["src/**/*.js", "main.js"]
 }

@@ -6,7 +6,7 @@ program.requiredOption('-e, --email <address>', 'Your digi4school login email');
 program.requiredOption('-b, --book <id>', 'The id of the book you want to download');
 program.option('-o, --out <name>', 'Output path, can specify file or folder');
 program.option('-p, --password <password>', 'Your digi4school login password (not recommended)');
-program.option('-r, --ranges <range>', 'Page ranges, i.e.: 5-10,12,15-', (value) => {
+program.option('-r, --ranges <ranges>', 'Page ranges, i.e.: 5-10,12,15-', (value) => {
 	return value
 		.split(',')
 		.map((range) => range.split('-'))
