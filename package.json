@@ -1,7 +1,7 @@
 {
 	"name": "digi4offline",
 	"version": "1.0.1",
-	"description": "Download digi4school books as PDFs for offline use.",
+	"description": "Node.js based command line tool for downloading digi4school books as PDFs for offline use.",
 	"main": "index.js",
 	"module": "main.js",
 	"author": "Wendelin Muth",
