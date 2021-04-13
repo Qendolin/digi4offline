@@ -19,6 +19,7 @@ Options:
   --dop <degree>             The amount of pages that can be downloaded at the same time (default: 5)
   --pageRetries <retries>    How often a page download should be retired (default: 10)
   --imageRetries <retries>   How often a image download should be retired (default: 10)
+  -l, --labels               Use page labels instead of indices for ranges
   -h, --help                 display help for command
 
 The password argument is optional. When not provided you will be prompted to input your password into the terminal. This way is recommended because you password will be hidden.
