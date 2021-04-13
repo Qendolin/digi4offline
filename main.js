@@ -10,7 +10,7 @@ program.option('-r, --ranges <ranges>', 'Page ranges, i.e.: 5-10,12,15-', (value
 	return value
 		.split(',')
 		.map((range) => range.split('-'))
-		.map(([from, to]) => ({ from: parseInt(from), to: parseInt(to === undefined ? from : to) }));
+		.map(([from, to]) => ({ from: from, to: to === undefined ? from : to }));
 });
 program.option(
 	'--dop <degree>',
@@ -30,6 +30,7 @@ program.option(
 	(value) => parseInt(value),
 	10
 );
+program.option('-l, --labels', 'Use page labels instead of indices for ranges');
 
 program.on('--help', () => {
 	console.log('');
@@ -66,10 +67,11 @@ if (!password) {
  * @property {string} email
  * @property {string} book
  * @property {string} out
- * @property {import('./src/book').Range[]} ranges
+ * @property {import('./src/util').PageRange[]} ranges
  * @property {number} dop
  * @property {number} pageRetries
  * @property {number} imageRetries
+ * @property {boolean} labels
  */
 
 /**

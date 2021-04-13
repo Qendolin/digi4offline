@@ -10,6 +10,7 @@ const fs = require('fs');
  * @property {number} dop
  * @property {number} pageRetries
  * @property {number} imageRetries
+ * @property {boolean} labels
  */
 
 export class Digi4Offline {
@@ -36,7 +37,7 @@ export class Digi4Offline {
 	/**
 	 * @param {string} bookId
 	 * @param {string} file
-	 * @param {import('./book').Range[]} ranges
+	 * @param {import('./util').PageRange[]} ranges
 	 */
 	async download(bookId, file, ranges) {
 		const book = await this.#user.aquireBook(bookId);
@@ -48,7 +49,7 @@ export class Digi4Offline {
 
 		const downloader = new RangeDownloader(this.options.dop, book);
 
-		const pages = await book.resolveRanges(ranges);
+		const pages = await book.resolveRanges(ranges, this.options.labels);
 		const info = await book.info();
 		console.log(
 			'Title: %s\nSBNR: %s\nPublisher: %s\n\tURL: %s\n\tAddress: %s\n\tPhone Number: %s\n\tEmail Adress: %s',
@@ -86,7 +87,7 @@ export class Digi4Offline {
 	 * @private
 	 * @param {string} out
 	 * @param {string} bookId
-	 * @param {import('./book').MetaInfo} metaInfo
+	 * @param {import('./meta').MetaInfo} metaInfo
 	 * @param {any} pages
 	 */
 	_createPdf(out, bookId, metaInfo, pages) {

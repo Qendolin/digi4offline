@@ -4,7 +4,7 @@ import { DOMParser, XMLSerializer } from 'xmldom';
 import asyncPool from 'tiny-async-pool';
 
 /**
- * @typedef {import('./util').Range} Range
+ * @typedef {import('./util').BufferRange} Range
  */
 
 export class RangeDownloader {
@@ -90,7 +90,7 @@ export class RangeDownloader {
 			}
 
 			chunks.push(data);
-			chunkMap.set(link, { from: totalLength, to: totalLength + data.length });
+			chunkMap.set(link, { start: totalLength, end: totalLength + data.length });
 			totalLength += data.length;
 		});
 

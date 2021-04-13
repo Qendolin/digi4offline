@@ -1,33 +1,10 @@
 import { retryAsync, ResponseError } from './util.js';
 import fetch, { FetchError } from 'node-fetch';
-import { DOMParser } from 'xmldom';
-
-const metaInfoNames = [
-	'title',
-	'sbnr',
-	'publisher',
-	'publisherweb',
-	'publisheradr',
-	'publishertel',
-	'publishermail',
-	'pageLabels',
-];
-
-/**
- * @typedef MetaInfo
- * @property {string} title
- * @property {string} sbnr
- * @property {string} publisher
- * @property {string} publisherweb
- * @property {string} publisheradr
- * @property {string} publishertel
- * @property {string} publishermail
- * @property {string} pageLabels
- */
+import memoize from 'memoizee';
+import { MetaInfoParser } from './meta';
 
 /**
  * @typedef {import('./auth').Cookies} Cookies
- * @typedef {import('./util').Range} Range
  */
 
 /**
@@ -43,7 +20,6 @@ export class Book {
 	credentials;
 	/** @type {Options} */
 	options;
-
 	/**
 	 * @param {string} id
 	 * @param {Cookies} creds
@@ -57,6 +33,12 @@ export class Book {
 			retryImage: 10,
 			...options,
 		};
+
+		this.info = memoize(this.info, { promise: true });
+		this.pageCount = memoize(this.pageCount, { promise: true });
+		this.page = memoize(this.page, { promise: true });
+		this.resolveRanges = memoize(this.resolveRanges, { promise: true });
+		this.image = memoize(this.image, { promise: true });
 	}
 
 	get url() {
@@ -64,7 +46,7 @@ export class Book {
 	}
 
 	/**
-	 * @returns {Promise<MetaInfo>}
+	 * @returns {Promise<import('./meta').MetaInfo>}
 	 */
 	async info() {
 		const src = await fetch(`https://a.digi4school.at/ebook/${this.id}/`, {
@@ -79,17 +61,7 @@ export class Book {
 			return res.text();
 		});
 
-		const doc = new DOMParser().parseFromString(src, 'text/html');
-		const metas = Array.from(doc.documentElement.getElementsByTagName('meta'));
-		/** @type {any} */
-		const info = Object.fromEntries(metaInfoNames.map((name) => [name, '']));
-		for (const meta of metas) {
-			const name = meta.getAttribute('name');
-			if (metaInfoNames.includes(name)) {
-				info[name] = meta.getAttribute('content');
-			}
-		}
-		return info;
+		return MetaInfoParser.parse(src);
 	}
 
 	/**
@@ -135,19 +107,34 @@ export class Book {
 	}
 
 	/**
-	 * @param {Range[]} ranges
+	 * @param {import('./util').PageRange[]} ranges
+	 * @param {boolean} useLabels
 	 */
-	async resolveRanges(ranges) {
+	async resolveRanges(ranges, useLabels) {
 		const pageCount = await this.pageCount();
+		const info = useLabels ? await this.info() : null;
 
 		const pages = ranges
-			.reduce((pages, { from, to }, index) => {
+			.reduce((pages, { from: fromPageOrLabel, to: toPageOrLabel }, index) => {
+				/** @type {number} */
+				let from;
+				/** @type {number} */
+				let to;
+				if (useLabels) {
+					from = info.labelPage(fromPageOrLabel);
+					to = info.labelPage(toPageOrLabel);
+				} else {
+					from = Number(fromPageOrLabel);
+					to = Number(toPageOrLabel);
+				}
+
 				if (isNaN(from) && index !== 0) {
 					throw new Error(`Range ${index + 1} has invalid from`);
 				}
 				if (isNaN(to) && index != ranges.length - 1) {
 					throw new Error(`Range ${index + 1} has invalid to`);
 				}
+
 				from = isNaN(from) ? 1 : from;
 				to = isNaN(to) ? pageCount : to;
 

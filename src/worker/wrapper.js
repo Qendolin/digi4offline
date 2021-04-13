@@ -20,7 +20,7 @@ export class Writer extends EventEmitter {
 	done;
 	/**
 	 * @param {string} file
-	 * @param {import('../book').MetaInfo} info
+	 * @param {import('../meta').MetaInfo} info
 	 */
 	constructor(file, info, workerFile = __dirname + '/worker-loader.js') {
 		super();
@@ -63,7 +63,7 @@ export class Writer extends EventEmitter {
 
 	/**
 	 * @param {Buffer} svgBuffer
-	 * @param {Map<string, import('../util.js').Range>} images Map of image link to buffer slice
+	 * @param {Map<string, import('../util.js').BufferRange>} images Map of image link to buffer slice
 	 * @param {Buffer} imageBuffer
 	 * @param {number} pageIndex
 	 * @param {number} pageNr

@@ -5,8 +5,9 @@ import SVGtoPDF from 'svg-to-pdfkit';
 import { DOMParser } from 'xmldom';
 import canvas from 'canvas';
 import fetch from 'node-fetch';
-import { Canvg, presets } from 'canvg';
+import { Canvg, presets as CanvgPresets } from 'canvg';
 import { Message } from './message.js';
+import { Image } from 'canvas';
 
 // https://chromium.googlesource.com/chromium/blink-public/+/refs/heads/master/default_100_percent/blink/broken_image.png
 const brokenImageSrc =
@@ -19,8 +20,12 @@ const brokenImageSrc =
 	'DZpG31DDVDXNhRMcghuyWu1YT6TROF3zZ2TQEmxCNPUObqi/34q2hdZ/I+Oud60HvdY+UGdnF9rbO8yg' +
 	'HxS9dVss+AQqZY47NSC2iwAAAABJRU5ErkJggg==';
 
+/**
+ * @typedef {import('../util.js').BufferRange} Range
+ */
+
 class PageWriter {
-	/** @type {{svgSrc: string, imageBuffer: Buffer, images: Map<string, import('../util.js').Range>, pageNr: number}[]} */
+	/** @type {{svgSrc: string, imageBuffer: Buffer, images: Map<string, Range>, pageNr: number}[]} */
 	pages = [];
 	writerIndex = 0;
 
@@ -33,7 +38,7 @@ class PageWriter {
 
 	/**
 	 * @param {string} svgSrc
-	 * @param {Map<string, import('../util.js').Range>} images Map of image link to buffer slice
+	 * @param {Map<string, Range>} images Map of image link to buffer slice
 	 * @param {Buffer} imageBuffer
 	 * @param {number} pageNr
 	 * @param {number} pageIndex
@@ -94,21 +99,21 @@ class PageWriter {
 
 		try {
 			SVGtoPDF(this.pdf, svgSrc, 0, 0, {
-				fontCallback: (family, bold, italic, options, ...args) => {
+				/*fontCallback: (family, bold, italic, options, ...args) => {
 					console.log('Font Callback: %s %s %s %o .', family, bold, italic, options, ...args);
-				},
+				},*/
 				imageCallback: (link) => {
 					if (!images.has(link)) {
 						console.error('Missing image on page %s: %s', pageNr, link);
 						return `data:image/png;base64,${brokenImageSrc}`;
 					}
 					const range = images.get(link);
-					return imageBuffer.slice(range.from, range.to);
+					return imageBuffer.slice(range.start, range.end);
 				},
-				documentCallback: (file, ...args) => {
+				/*documentCallback: (file, ...args) => {
 					console.log('Document Callback: %o .', file, ...args);
 					return file;
-				},
+				},*/
 				/*colorCallback: ([[r, g, b], a], raw, ...args) => {
 					console.log('Color Callback: %s %s %s %s %s.', r, g, b, a, raw, ...args);
 					return [[r, g, b], a];
@@ -118,9 +123,9 @@ class PageWriter {
 				},
 			});
 		} catch (e) {
-			this.notifyError(`Failed to convert page #${this.writerIndex}:${page}, using png fallback, %s`, e);
+			this.notifyError(`Failed to convert page #${this.writerIndex}:${page}, using png fallback: %s`, e);
 			try {
-				const png = await svg2img(svgSrc, 909, 1286);
+				const png = await svg2img(svgSrc, 909, 1286, imageBuffer, images);
 				this.pdf.image(png, 0, 0, { fit: [909, 1286] });
 			} catch (e) {
 				this.notifyError(`Failed to convert page #${this.writerIndex}:${page} to png: %s`, e);
@@ -168,20 +173,57 @@ parentPort.on('message', (m) => {
 });
 
 /**
+ *
+ * @param {Buffer} imageBuffer
+ * @param {Map<string, Range>} images
+ * @param {string} link
+ * @returns {Buffer | string}
+ */
+function getImage(imageBuffer, images, pageNr, link) {
+	if (!images.has(link)) {
+		console.error('Missing image on page %s: %s', pageNr, link);
+		return `data:image/png;base64,${brokenImageSrc}`;
+	}
+	const range = images.get(link);
+	return imageBuffer.slice(range.start, range.end);
+}
+
+/**
+ * @param {string | Buffer} src
+ * @returns {Promise<Image>}
+ */
+async function loadImage(src) {
+	const img = new Image();
+	const promise = new Promise((resolve, reject) => {
+		img.onload = () => resolve(img);
+		img.onerror = reject;
+	});
+	img.src = src;
+	return promise;
+}
+
+/**
  * @param {string} svgSrc
  * @param {number} width
  * @param {number} height
+ * @param {Buffer} imageBuffer
+ * @param {Map<string,Range>} images
  */
-async function svg2img(svgSrc, width, height) {
-	const preset = presets.node({
+async function svg2img(svgSrc, width, height, imageBuffer, images, page) {
+	const preset = CanvgPresets.node({
 		DOMParser,
 		canvas,
 		fetch,
 	});
+	preset.createImage;
 	const cnv = preset.createCanvas(width, height);
 	const ctx = cnv.getContext('2d');
 
-	const v = Canvg.fromString(ctx, svgSrc, preset);
+	const v = Canvg.fromString(ctx, svgSrc, {
+		...preset,
+		// @ts-ignore
+		createImage: (src) => loadImage(getImage(imageBuffer, images, page, src)),
+	});
 	await v.render();
 
 	return cnv.toBuffer('image/png');

@@ -72,7 +72,13 @@ export class ResponseError extends DetailError {
 }
 
 /**
- * @typedef Range
- * @property {number} from
- * @property {number} to
+ * @typedef PageRange
+ * @property {number | string} from
+ * @property {number | string} to
+ */
+
+/**
+ * @typedef BufferRange
+ * @property {number} start
+ * @property {number} end
  */
