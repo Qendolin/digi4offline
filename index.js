@@ -4,5 +4,5 @@ if (process.env.NODE_ENV === 'production') {
 } else {
 	// @ts-ignore
 	require = require('esm')(module);
-	module.exports = require('./main.js');
+	module.exports = require('./jspdf.js');
 }

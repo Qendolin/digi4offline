@@ -11,5 +11,5 @@
 	"typeAcquisition": {
 		"enable": true
 	},
-	"include": ["src/**/*.js", "main.js"]
+	"include": ["src/**/*.js", "main.js", "jspdf.js"]
 }

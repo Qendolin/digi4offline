@@ -73,7 +73,14 @@ export class Digi4Offline {
 
 		await downloader.download(pages, ({ svg, images }, { pageIndex, pageNr, downloadNr }) => {
 			console.log('Downloaded page %s/%s %s', downloadNr, pages.length, pageNr);
-			writer.write(svg, images.map, images.buffer, pageIndex, pageNr);
+			fs.writeFileSync(`./tmp/${pageNr}.svg`, svg, { encoding: 'utf-8' });
+			images.map.forEach((range, key) => {
+				fs.writeFileSync(
+					`./tmp/${pageNr}-${key.replace(/\//g, '-')}`,
+					images.buffer.slice(range.start, range.end)
+				);
+			});
+			//writer.write(svg, images.map, images.buffer, pageIndex, pageNr);
 		});
 
 		writer.end();

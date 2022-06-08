@@ -1,0 +1,34 @@
+diff --git a/node_modules/jsdom/lib/jsdom/living/helpers/stylesheets.js b/node_modules/jsdom/lib/jsdom/living/helpers/stylesheets.js
+index 7138599..32d9440 100644
+--- a/node_modules/jsdom/lib/jsdom/living/helpers/stylesheets.js
++++ b/node_modules/jsdom/lib/jsdom/living/helpers/stylesheets.js
+@@ -40,6 +40,14 @@ exports.createStylesheet = (sheetText, elementImpl, baseURL) => {
+     return;
+   }
+ 
++  // According to https://github.com/WICG/webcomponents/issues/56 and related discussions.
++  // Browsers behave inconsistently but none load import rules
++  // and only firefox adds it to .styleSheets. HTMLStyleElement.sheet however is always populated.
++  if (!elementImpl._ownerDocument._defaultView) {
++    elementImpl.sheet = sheet;
++    return;
++  }
++
+   scanForImportRules(elementImpl, sheet.cssRules, baseURL);
+ 
+   addStylesheet(sheet, elementImpl);
+diff --git a/node_modules/jsdom/lib/jsdom/living/nodes/HTMLStyleElement-impl.js b/node_modules/jsdom/lib/jsdom/living/nodes/HTMLStyleElement-impl.js
+index 7dcc6fb..d002221 100644
+--- a/node_modules/jsdom/lib/jsdom/living/nodes/HTMLStyleElement-impl.js
++++ b/node_modules/jsdom/lib/jsdom/living/nodes/HTMLStyleElement-impl.js
+@@ -51,8 +51,8 @@ class HTMLStyleElementImpl extends HTMLElementImpl {
+       removeStylesheet(this.sheet, this);
+     }
+ 
+-    // Browsing-context connected, per https://github.com/whatwg/html/issues/4547
+-    if (!this.isConnected || !this._ownerDocument._defaultView) {
++    // See https://github.com/whatwg/html/issues/4547 and https://html.spec.whatwg.org/multipage/semantics.html#update-a-style-block
++    if (!this.isConnected) {
+       return;
+     }
+ 
