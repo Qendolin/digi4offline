@@ -139,7 +139,9 @@ export class User {
 		const shelfRequest = await this._findBookInShelf(bookId);
 		const catRequets = await this._ltiShelf(shelfRequest);
 		await this._ltiCatalog(catRequets);
-		return new Book(bookId, Cookies.parse(this.#cookies.toString()));
+		const book = new Book(bookId, Cookies.parse(this.#cookies.toString()));
+		await book.initialize();
+		return book;
 	}
 
 	/**

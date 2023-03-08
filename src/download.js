@@ -1,5 +1,4 @@
 import { sanitizeSvg } from './sanitize.js';
-import { toArrayBuffer } from './util.js';
 import { DOMParser, XMLSerializer } from 'xmldom';
 import asyncPool from 'tiny-async-pool';
 

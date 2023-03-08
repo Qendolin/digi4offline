@@ -2,6 +2,7 @@ import { retryAsync, ResponseError } from './util.js';
 import fetch, { FetchError } from 'node-fetch';
 import memoize from 'memoizee';
 import { MetaInfoParser } from './meta';
+import { DOMParser } from 'xmldom';
 
 /**
  * @typedef {import('./auth').Cookies} Cookies
@@ -20,6 +21,16 @@ export class Book {
 	credentials;
 	/** @type {Options} */
 	options;
+
+	/** @type {number} */
+	_initalized = 0;
+	/** @type {number} */
+	_pageCount;
+	/** @type {string} */
+	_bookHtml;
+	/** @type {(number) => string} */
+	_pageUrlFormat = (nr) => `${nr}/`;
+
 	/**
 	 * @param {string} id
 	 * @param {Cookies} creds
@@ -34,6 +45,7 @@ export class Book {
 			...options,
 		};
 
+		this.init = memoize(this.initialize, { promise: true });
 		this.info = memoize(this.info, { promise: true });
 		this.pageCount = memoize(this.pageCount, { promise: true });
 		this.page = memoize(this.page, { promise: true });
@@ -45,11 +57,11 @@ export class Book {
 		return `https://a.digi4school.at/ebook/${this.id}/`;
 	}
 
-	/**
-	 * @returns {Promise<import('./meta').MetaInfo>}
-	 */
-	async info() {
-		const src = await fetch(`https://a.digi4school.at/ebook/${this.id}/`, {
+	async initialize() {
+		if (this._initalized != 0) return;
+		this._initalized = 1;
+
+		this._bookHtml = await fetch(this.url, {
 			headers: {
 				accept: '*/*',
 				'accept-language': '*',
@@ -57,27 +69,95 @@ export class Book {
 			},
 			method: 'GET',
 		}).then((res) => {
-			if (!res.ok) throw new ResponseError('failed to fetch info', res);
+			if (!res.ok) throw new ResponseError('failed to fetch book html', res);
 			return res.text();
 		});
 
-		return MetaInfoParser.parse(src);
+		const match = this._bookHtml.match(/IDRViewer.makeNavBar\((\d+).*?(true|false)\)/);
+		if (match == null) {
+			throw new Error(`Could not match init regex`);
+		}
+
+		this._pageCount = parseInt(match[1]);
+		const indirectPages = match[2] != 'false';
+
+		if (indirectPages) {
+			this._pageUrlFormat = await this._getIndirectPageUrlFormat();
+		} else {
+			this._pageUrlFormat = (_nr) => '';
+		}
+
+		this._initalized = 2;
+	}
+
+	isInitialzed() {
+		return this._initalized == 2;
 	}
 
 	/**
-	 * @returns {Promise<number>}
+	 * @returns {Promise<(number) => string>}
 	 */
-	async pageCount() {
-		const src = await fetch(`https://a.digi4school.at/ebook/${this.id}/`, {
+	async _getIndirectPageUrlFormat() {
+		const href = new URL('1.html', this.url).href;
+		const firstPageHtml = await fetch(href, {
 			headers: {
+				accept: '*/*',
+				'accept-language': '*',
 				cookie: this.credentials.toString(),
 			},
+			method: 'GET',
 		}).then((res) => {
-			if (!res.ok) throw new ResponseError('failed to fetch page count', res);
+			if (!res.ok) throw new ResponseError('failed to fetch first page html', res);
 			return res.text();
 		});
+		console.log(firstPageHtml);
+		const firstPage = new DOMParser().parseFromString(firstPageHtml, 'text/html');
 
-		return parseInt(src.match(/IDRViewer.makeNavBar\((\d+)/)[1]);
+		const jpedal = firstPage.getElementById('jpedal');
+		if (jpedal == null) {
+			console.warn('unexpected format: no jpedal found');
+			return this._pageUrlFormat;
+		}
+		const svgs = Array.from(jpedal.getElementsByTagName('object'));
+		if (svgs.length == 0) {
+			console.warn('unexpected format: no <object> found');
+			return this._pageUrlFormat;
+		}
+
+		const svgSource = svgs[0].getAttribute('data');
+		if (!svgSource || !svgSource.includes('1.svg')) {
+			console.warn('unexpected format: no 1.svg found');
+			return this._pageUrlFormat;
+		}
+
+		const parts = svgSource.replace('1.svg', '').split('1');
+		return (nr) => parts.join(String(nr));
+	}
+
+	/**
+	 * @param {number} nr
+	 * @returns {string}
+	 */
+	pageBaseUrl(nr) {
+		return new URL(this._pageUrlFormat(nr), this.url).href;
+	}
+
+	/**
+	 * @returns {Promise<import('./meta').MetaInfo>}
+	 */
+	async info() {
+		return MetaInfoParser.parse(this._bookHtml);
+	}
+
+	/**
+	 * @returns {number}
+	 */
+	pageCount() {
+		if (!this.isInitialzed()) {
+			throw new Error(`book is not initialized`);
+		}
+
+		return this._pageCount;
 	}
 
 	/**
@@ -85,8 +165,9 @@ export class Book {
 	 * @returns {Promise<string>} Page content
 	 */
 	async page(nr) {
+		const href = new URL(`${nr}.svg`, this.pageBaseUrl(nr)).href;
 		const content = await retryAsync(this.options.retryPage, async () => {
-			return fetch(`https://a.digi4school.at/ebook/${this.id}/${nr}/${nr}.svg`, {
+			return fetch(href, {
 				headers: {
 					accept: '*/*',
 					'accept-language': '*',
@@ -111,7 +192,7 @@ export class Book {
 	 * @param {boolean} useLabels
 	 */
 	async resolveRanges(ranges, useLabels) {
-		const pageCount = await this.pageCount();
+		const pageCount = this.pageCount();
 		const info = useLabels ? await this.info() : null;
 
 		const pages = ranges
@@ -153,7 +234,7 @@ export class Book {
 	 * @returns {Promise<Buffer>}
 	 */
 	async image(pageNr, path) {
-		const href = new URL(path, `${this.url}${pageNr}/`).href;
+		const href = new URL(path, this.pageBaseUrl(pageNr)).href;
 
 		return retryAsync(this.options.retryImage, () => {
 			return fetch(href, {
