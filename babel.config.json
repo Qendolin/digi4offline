@@ -1,15 +1,11 @@
 {
-	"plugins": [
-		"@babel/plugin-transform-modules-commonjs",
-		"@babel/plugin-proposal-class-properties",
-		"transform-node-env-inline"
-	],
+	"plugins": ["@babel/plugin-transform-modules-commonjs", "transform-node-env-inline"],
 	"presets": [
 		[
 			"@babel/preset-env",
 			{
 				"targets": {
-					"node": "10"
+					"node": "18"
 				}
 			}
 		],
