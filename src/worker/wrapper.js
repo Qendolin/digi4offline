@@ -1,6 +1,10 @@
 import { Worker } from 'worker_threads';
 import { Message } from './message.js';
 import EventEmitter from 'events';
+import { dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * @event Writer#write

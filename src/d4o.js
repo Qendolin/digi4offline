@@ -2,8 +2,8 @@ import { User } from './auth.js';
 import { RangeDownloader } from './download.js';
 import { findRanges } from './util.js';
 import { Writer } from './worker/wrapper.js';
-const path = require('path');
-const fs = require('fs');
+import path from 'path';
+import fs from 'fs';
 
 /**
  * @typedef Options
@@ -35,12 +35,12 @@ export class Digi4Offline {
 	}
 
 	/**
-	 * @param {string} bookId
+	 * @param {string} bookIdOrUrl a book id like '3055' or url 'https://digi4school.at/ebook/10q594mvaytx'
 	 * @param {string} file
 	 * @param {import('./util').PageRange[]} ranges
 	 */
-	async download(bookId, file, ranges) {
-		const book = await this.#user.aquireBook(bookId);
+	async download(bookIdOrUrl, file, ranges) {
+		const book = await this.#user.aquireBook(bookIdOrUrl);
 		book.options = {
 			...book.options,
 			retryImage: this.options.imageRetries,
@@ -61,7 +61,7 @@ export class Digi4Offline {
 			info.publishertel,
 			info.publishermail
 		);
-		const pdfPath = this._createPdf(file || './', bookId, info, pages);
+		const pdfPath = this._createPdf(file || './', book.linkId, info, pages);
 
 		const writer = new Writer(pdfPath, info);
 		writer.on('write', ({ page, pageIndex }) => {
@@ -81,6 +81,18 @@ export class Digi4Offline {
 		await writer.done;
 		console.log(pdfPath);
 		writer.worker.unref();
+	}
+
+	/**
+	 *
+	 * @param {string} bookIdOrUrl
+	 * @returns {boolean} true when its valid
+	 */
+	validateBookIdOrUrl(bookIdOrUrl) {
+		const notBookId = !!bookIdOrUrl.match(/[^\d/]/);
+		const url = !!bookIdOrUrl.match(/^https?:\/\/digi4school\.at\/ebook\/[\da-z]{8,}$/g);
+
+		return url || !notBookId;
 	}
 
 	/**

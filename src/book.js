@@ -1,7 +1,7 @@
 import { retryAsync, ResponseError } from './util.js';
 import fetch, { FetchError } from 'node-fetch';
 import memoize from 'memoizee';
-import { MetaInfoParser } from './meta';
+import { MetaInfoParser } from './meta.js';
 import { DOMParser } from 'xmldom';
 
 /**
@@ -16,7 +16,9 @@ import { DOMParser } from 'xmldom';
 
 export class Book {
 	/** @type {string} */
-	id;
+	linkId;
+	/** @type {URL} */
+	contentUrl;
 	/** @type {Cookies} */
 	credentials;
 	/** @type {Options} */
@@ -33,11 +35,13 @@ export class Book {
 
 	/**
 	 * @param {string} id
+	 * @param {URL} url usually in the form of `https://a.digi4school.at/ebook/${bookId}/` but not always
 	 * @param {Cookies} creds
 	 * @param {Options} [options]
 	 */
-	constructor(id, creds, options) {
-		this.id = id;
+	constructor(id, url, creds, options) {
+		this.linkId = id;
+		this.contentUrl = url;
 		this.credentials = creds;
 		this.options = {
 			retryPage: 10,
@@ -53,15 +57,11 @@ export class Book {
 		this.image = memoize(this.image, { promise: true });
 	}
 
-	get url() {
-		return `https://a.digi4school.at/ebook/${this.id}/`;
-	}
-
 	async initialize() {
 		if (this._initalized != 0) return;
 		this._initalized = 1;
 
-		this._bookHtml = await fetch(this.url, {
+		this._bookHtml = await fetch(this.contentUrl, {
 			headers: {
 				accept: '*/*',
 				'accept-language': '*',
@@ -98,7 +98,7 @@ export class Book {
 	 * @returns {Promise<(number) => string>}
 	 */
 	async _getIndirectPageUrlFormat() {
-		const href = new URL('1.html', this.url).href;
+		const href = new URL('1.html', this.contentUrl).href;
 		const firstPageHtml = await fetch(href, {
 			headers: {
 				accept: '*/*',
@@ -110,7 +110,6 @@ export class Book {
 			if (!res.ok) throw new ResponseError('failed to fetch first page html', res);
 			return res.text();
 		});
-		console.log(firstPageHtml);
 		const firstPage = new DOMParser().parseFromString(firstPageHtml, 'text/html');
 
 		const jpedal = firstPage.getElementById('jpedal');
@@ -139,7 +138,7 @@ export class Book {
 	 * @returns {string}
 	 */
 	pageBaseUrl(nr) {
-		return new URL(this._pageUrlFormat(nr), this.url).href;
+		return new URL(this._pageUrlFormat(nr), this.contentUrl).href;
 	}
 
 	/**

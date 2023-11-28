@@ -35,3 +35,7 @@ The book id is part of the url of an open book. (The book must be activated for 
 2. Open a terminal
 3. Run `npm install -g digi4offline`
 4. See Usage
+
+# Notes
+
+LTI means [Learning Tools Interoperability](https://en.wikipedia.org/wiki/Learning_Tools_Interoperability).

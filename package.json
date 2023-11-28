@@ -6,7 +6,7 @@
 	"module": "main.js",
 	"author": "Wendelin Muth",
 	"license": "MPL-2.0",
-	"type": "commonjs",
+	"type": "module",
 	"scripts": {
 		"build": "cross-env NODE_ENV=production babel --delete-dir-on-start -d lib .",
 		"prepublish": "npm run build"

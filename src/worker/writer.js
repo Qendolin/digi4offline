@@ -102,6 +102,7 @@ class PageWriter {
 				/*fontCallback: (family, bold, italic, options, ...args) => {
 					console.log('Font Callback: %s %s %s %o .', family, bold, italic, options, ...args);
 				},*/
+				// @ts-ignore
 				imageCallback: (link) => {
 					if (!images.has(link)) {
 						console.error('Missing image on page %s: %s', pageNr, link);

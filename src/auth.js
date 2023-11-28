@@ -47,10 +47,10 @@ export class User {
 	#domParser = new DOMParser();
 
 	/**
-	 * Searches for book in user's bookshelf
+	 * Searches for book in user's bookshelf, only works for books hosted on digi4school directly
 	 * @private
 	 * @param {string} bookId
-	 * @returns {Promise<URLSearchParams>} Bookshelf LTI request
+	 * @returns {Promise<[string, URLSearchParams]>} Bookshelf LTI request
 	 */
 	async _findBookInShelf(bookId) {
 		const src = await fetch(`https://digi4school.at/br/find/${bookId}/`, {
@@ -66,10 +66,29 @@ export class User {
 	}
 
 	/**
+	 * Searches for book in user's bookshelf
+	 * @private
+	 * @param {string} bookUrl a direct url like https://digi4school.at/ebook/10q594mvaytx
+	 * @returns {Promise<[string, URLSearchParams]>} Bookshelf LTI request
+	 */
+	async _openBookFromShelf(bookUrl) {
+		const src = await fetch(bookUrl, {
+			headers: {
+				cookie: this.#cookies.toString(),
+			},
+		}).then((res) => {
+			if (res.status != 200) throw new ResponseError('failed open book in shelf', res);
+			return res.text();
+		});
+
+		return this._parseLtiResponse(src);
+	}
+
+	/**
 	 * Parse LTI request from form body
 	 * @private
 	 * @param {string} src
-	 * @returns {URLSearchParams} Bookshelf LTI request
+	 * @returns {[string, URLSearchParams]} Bookshelf LTI request
 	 */
 	_parseLtiResponse(src) {
 		const doc = this.#domParser.parseFromString(src, 'text/html');
@@ -79,16 +98,17 @@ export class User {
 		Array.from(form.getElementsByTagName('input')).forEach((input) => {
 			params.set(input.getAttribute('name'), input.getAttribute('value'));
 		});
-		return params;
+		return [form.getAttribute('action'), params];
 	}
 
 	/**
 	 * @private
+	 * @param {string} url
 	 * @param {URLSearchParams} params
-	 * @returns {Promise<URLSearchParams>} Calatog LTI request
+	 * @returns {Promise<[string, URLSearchParams]>} Catalog LTI request
 	 */
-	async _ltiShelf(params) {
-		const src = await fetch('https://kat.digi4school.at/lti', {
+	async _ltiShelf(url, params) {
+		const src = await fetch(url, {
 			method: 'POST',
 			body: params.toString(),
 			headers: {
@@ -109,10 +129,12 @@ export class User {
 
 	/**
 	 * @private
+	 * @param {string} launchUrl
 	 * @param {URLSearchParams} params
+	 * @returns {Promise<URL>} the content url
 	 */
-	async _ltiCatalog(params) {
-		return fetch('https://a.digi4school.at/lti', {
+	async _ltiLaunchRequest(launchUrl, params) {
+		return fetch(launchUrl, {
 			method: 'POST',
 			body: params.toString(),
 			headers: {
@@ -124,25 +146,39 @@ export class User {
 			redirect: 'manual',
 		}).then((res) => {
 			if (res.status != 302) throw new ResponseError('lti failed', res);
+			const location = res.headers.get('location');
+			if (!!location.match(/^https?:\/\/digi4school\.at\/err/)) {
+				throw new Error(`lti returned error url: ${location}`);
+			}
 			this.#cookies.set(...res.headers.raw()['set-cookie']);
+			return new URL(location);
 		});
 	}
 
 	/**
 	 * Aquires book lock
-	 * @param {string} bookId
+	 * @param {string} linkIdOrUrl
 	 * @returns {Promise<Book>}
 	 */
-	async aquireBook(bookId) {
+	async aquireBook(linkIdOrUrl) {
 		if (!this.#authenticated) throw new Error('Not authenticated');
 
-		const shelfRequest = await this._findBookInShelf(bookId);
-		const catRequets = await this._ltiShelf(shelfRequest);
-		await this._ltiCatalog(catRequets);
-		const book = new Book(bookId, Cookies.parse(this.#cookies.toString()));
+		let shelfUrl = null,
+			shelfRequest = null;
+		if (linkIdOrUrl.startsWith('http')) {
+			[shelfUrl, shelfRequest] = await this._openBookFromShelf(linkIdOrUrl);
+		} else {
+			[shelfUrl, shelfRequest] = await this._findBookInShelf(linkIdOrUrl);
+		}
+		const [launchUrl, launchRequest] = await this._ltiShelf(shelfUrl, shelfRequest);
+		const linkId = launchRequest.get('resource_link_id');
+		const contentUrl = await this._ltiLaunchRequest(launchUrl, launchRequest);
+		const book = new Book(linkId, contentUrl, Cookies.parse(this.#cookies.toString()));
 		await book.initialize();
 		return book;
 	}
+
+	_isUniqueBookId;
 
 	/**
 	 * @param {String} email

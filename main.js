@@ -41,6 +41,9 @@ program.on('--help', () => {
 	console.log('The book id is part of the url of an open book. (The book must be activated for your account) e.g.:');
 	console.log('	for /ebook/5432/1/index.html the id is 5432/1');
 	console.log('	for /ebook/3404/ the id is 3404');
+	console.log(
+		'This only works for books that are directly hosted on digi4school.at, for other domains go to your bookshelf (https://digi4school.at/ebooks), right-click the book that you want to download, and select "Copy link address". Use it as the book id.'
+	);
 });
 
 program.parse(process.argv);
@@ -81,5 +84,10 @@ if (!password) {
 async function main(options, password) {
 	const d4o = new Digi4Offline(options);
 	await d4o.login(options.email, password);
+
+	if (!d4o.validateBookIdOrUrl(options.book)) {
+		throw new Error("invalid 'book' option format");
+	}
+
 	await d4o.download(options.book, options.out, options.ranges);
 }
