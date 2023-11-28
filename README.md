@@ -27,6 +27,7 @@ The password argument is optional. When not provided you will be prompted to inp
 The book id is part of the url of an open book. (The book must be activated for your account) e.g.:
         for /ebook/5432/1/index.html the id is 5432/1
         for /ebook/3404/ the id is 3404
+This only works for books that are directly hosted on digi4school.at, for other domains go to your bookshelf (https://digi4school.at/ebooks), right-click the book that you want to download, and select "Copy link address". Use it as the book id. Example: "https://digi4school.at/ebook/10q594mvaytx".
 ```
 
 # Setup

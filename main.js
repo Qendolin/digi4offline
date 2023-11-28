@@ -42,7 +42,7 @@ program.on('--help', () => {
 	console.log('	for /ebook/5432/1/index.html the id is 5432/1');
 	console.log('	for /ebook/3404/ the id is 3404');
 	console.log(
-		'This only works for books that are directly hosted on digi4school.at, for other domains go to your bookshelf (https://digi4school.at/ebooks), right-click the book that you want to download, and select "Copy link address". Use it as the book id.'
+		'This only works for books that are directly hosted on digi4school.at, for other domains go to your bookshelf (https://digi4school.at/ebooks), right-click the book that you want to download, and select "Copy link address". Use it as the book id. Example: "https://digi4school.at/ebook/10q594mvaytx".'
 	);
 });
 
